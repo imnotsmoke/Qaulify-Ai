@@ -87,8 +87,9 @@ STATE_HINTS = {
         "If no properties match, explain politely and offer alternatives."
     ),
     ConversationState.BOOKING: (
-        "The lead is ready to book a viewing. Provide the Calendly link and encourage them "
-        "to pick a convenient time slot."
+        "The lead is ready to book a viewing. Provide the Calendly booking link "
+        "and encourage them to pick a convenient time slot. "
+        "After they confirm a booking, ask for their email to send a confirmation."
     ),
     ConversationState.AGENT_HANDOVER: "",
     ConversationState.DONE: "",
@@ -391,6 +392,16 @@ class ConversationFlow:
         if note:
             messages.append({"role": "system", "content": note})
 
+        # Calendly booking link (especially relevant in BOOKING state)
+        if self.state == ConversationState.BOOKING:
+            calendly_link = current_app.config.get("CALENDLY_LINK", "")
+            if calendly_link:
+                messages.append({
+                    "role": "system",
+                    "content": f"The Calendly booking link is: {calendly_link}. "
+                               f"Share this with the lead so they can book a viewing.",
+                })
+
         # State reminder
         messages.append({
             "role": "system",
@@ -432,3 +443,10 @@ class ConversationFlow:
         elif (self.lead.qualification_status == "qualified"
               and self.state == ConversationState.ASKING_EMAIL):
             self.advance()
+
+        # If we were in BOOKING state and now have the email, wrap up
+        if (self.state == ConversationState.BOOKING
+                and self.lead.email
+                and self.lead.viewing_requested):
+            self.transition_to(ConversationState.DONE)
+            logger.info("Lead %s: booking complete — state -> DONE", self.lead.id)
