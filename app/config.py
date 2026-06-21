@@ -18,10 +18,10 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
     FLASK_ENV = os.getenv("FLASK_ENV", "development")
 
-    # Database
+    # Database — defaults to SQLite in development, PostgreSQL in production
     SQLALCHEMY_DATABASE_URI = os.getenv(
         "DATABASE_URL",
-        "postgresql://user:password@localhost:5432/qualifyai",
+        "sqlite:///qualifyai.db",
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
@@ -36,6 +36,11 @@ class Config:
     # Calendly
     CALENDLY_API_KEY = os.getenv("CALENDLY_API_KEY", "")
     CALENDLY_WEBHOOK_SECRET = os.getenv("CALENDLY_WEBHOOK_SECRET", "")
+    CALENDLY_LINK = os.getenv(
+        "CALENDLY_LINK",
+        "https://calendly.com/your-name/property-viewing",
+    )
+    CALENDLY_PAT = os.getenv("CALENDLY_PAT", "")
 
     # Agency info
     AGENCY_NAME = os.getenv("AGENCY_NAME", "QualifyAI Realty")

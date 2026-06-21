@@ -66,14 +66,16 @@ def create_app(config_name: str = "default") -> Flask:
     app.scheduler = _init_scheduler(app)
 
     # Register blueprints
+    from app.routes.health import health_bp
     from app.routes.whatsapp import whatsapp_bp
     from app.routes.calendly import calendly_bp
     from app.routes.agent import agent_bp
 
+    app.register_blueprint(health_bp)
     app.register_blueprint(whatsapp_bp)
     app.register_blueprint(calendly_bp)
     app.register_blueprint(agent_bp)
-    app.logger.info("Blueprints registered: whatsapp, calendly, agent")
+    app.logger.info("Blueprints registered: health, whatsapp, calendly, agent")
 
     # Error handlers
     @app.errorhandler(400)
