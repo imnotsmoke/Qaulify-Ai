@@ -3,14 +3,11 @@ WhatsApp Cloud API webhook routes.
 
 Handles:
 - GET /webhook/whatsapp — verification challenge (Meta requires this)
-- POST /webhook/whatsapp — incoming messages from WhatsApp users,
-  routed through the AI conversation engine
+- POST /webhook/whatsapp — incoming messages from WhatsApp users
 """
 import logging
 
 from flask import Blueprint, request, jsonify, current_app
-
-from app.services.message_handler import process_incoming_message
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +20,7 @@ def verify_webhook():
     WhatsApp Cloud API requires a GET endpoint for webhook verification.
 
     Expected query parameters:
-        hub.mode         = "subscribe"
+        hub.mode     = "subscribe"
         hub.verify_token = <WHATSAPP_VERIFY_TOKEN>
         hub.challenge    = <challenge string to echo back>
 
@@ -48,24 +45,20 @@ def verify_webhook():
 @whatsapp_bp.route("/whatsapp", methods=["POST"])
 def handle_incoming():
     """
-    Receive incoming WhatsApp messages from Meta's Cloud API
-    and process them through the AI conversation engine.
+    Receive incoming WhatsApp messages from Meta's Cloud API.
 
     Expects a JSON payload with the standard WhatsApp webhook structure.
-    For each text message found, it looks up or creates a Lead,
-    runs the AI conversation flow, and sends a reply.
+    Currently logs the incoming payload and returns acknowledgement.
+    Will be expanded to process messages through the AI conversation engine.
     """
     data = request.get_json(silent=True)
     if not data:
         logger.warning("Received empty or non-JSON payload")
         return jsonify({"error": "Invalid payload"}), 400
 
-    logger.debug("Incoming WhatsApp webhook payload received")
+    logger.info("Incoming WhatsApp webhook: %s", data)
 
-    # ------------------------------------------------------------------
-    # Meta sends a statuses array for message delivery receipts —
-    # we can ignore those.
-    # ------------------------------------------------------------------
+    # Extract the message entry from the WhatsApp payload
     try:
         entry = data.get("entry", [])
         if not entry:
@@ -75,51 +68,28 @@ def handle_incoming():
             changes = entry_item.get("changes", [])
             for change in changes:
                 value = change.get("value", {})
-
-                # Skip status updates (delivery receipts etc.)
-                if value.get("statuses"):
-                    continue
-
                 messages = value.get("messages", [])
                 for msg in messages:
+                    # Extract standard WhatsApp message fields
+                    from_number = msg.get("from", "unknown")
+                    msg_id = msg.get("id", "")
                     msg_type = msg.get("type", "unknown")
-
-                    # Only handle text messages for now
-                    if msg_type != "text":
-                        logger.info("Skipping non-text message type: %s", msg_type)
-                        continue
-
-                    from_number = msg.get("from", "")
-                    text_body = msg.get("text", {}).get("body", "")
-
-                    if not from_number or not text_body:
-                        logger.warning("Missing from_number or text_body in message")
-                        continue
+                    text_body = ""
+                    if msg_type == "text":
+                        text_body = msg.get("text", {}).get("body", "")
 
                     logger.info(
-                        "Processing message from %s: %.120s",
+                        "Message from %s (type=%s, id=%s): %s",
                         from_number,
+                        msg_type,
+                        msg_id,
                         text_body,
                     )
 
-                    # Process through the AI conversation engine
-                    try:
-                        process_incoming_message(
-                            from_number=from_number,
-                            text_body=text_body,
-                        )
-                    except Exception as e:
-                        logger.error(
-                            "Error processing message from %s: %s",
-                            from_number,
-                            str(e),
-                            exc_info=True,
-                        )
-                        # Don't return 500 to Meta — they'll retry.
-                        # Log and continue.
-
+                    # TODO: route to AI conversation engine
+                    # This will be handled by conversation/flow.py in a future sprint
     except Exception as e:
-        logger.error("Error parsing WhatsApp payload: %s", str(e), exc_info=True)
+        logger.error("Error processing WhatsApp message: %s", str(e), exc_info=True)
+        return jsonify({"error": "Internal processing error"}), 500
 
-    # Always return 200 to acknowledge receipt (WhatsApp expects this)
     return jsonify({"status": "ok"}), 200
